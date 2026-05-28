@@ -13,6 +13,10 @@
   var historyEmptyState = document.getElementById("history-empty");
   var keypad = document.querySelector(".keypad");
   var parenthesisButton = keypad.querySelector('[data-action="parenthesis"]');
+  var phoneKeyboardMedia =
+    typeof window.matchMedia === "function"
+      ? window.matchMedia("(hover: none) and (pointer: coarse) and (max-width: 768px)")
+      : null;
   var historyEntries = [];
   var lastValidValue = 0;
 
@@ -78,6 +82,19 @@
   function setHistoryOpen(nextOpen) {
     historyPanel.hidden = !nextOpen;
     syncHistoryDrawer();
+  }
+
+  function syncPhoneInputMode() {
+    var hidePhoneKeyboard = !!(phoneKeyboardMedia && phoneKeyboardMedia.matches);
+
+    expressionInput.readOnly = hidePhoneKeyboard;
+    expressionInput.setAttribute("inputmode", hidePhoneKeyboard ? "none" : "text");
+    expressionInput.setAttribute(
+      "aria-label",
+      hidePhoneKeyboard
+        ? "Expression. Use the calculator buttons to enter values on mobile."
+        : "Expression"
+    );
   }
 
   function syncParenthesisButton() {
@@ -225,6 +242,14 @@
     setHistoryOpen(historyPanel.hidden);
   });
 
+  if (phoneKeyboardMedia) {
+    if (typeof phoneKeyboardMedia.addEventListener === "function") {
+      phoneKeyboardMedia.addEventListener("change", syncPhoneInputMode);
+    } else if (typeof phoneKeyboardMedia.addListener === "function") {
+      phoneKeyboardMedia.addListener(syncPhoneInputMode);
+    }
+  }
+
   keypad.addEventListener("click", function (event) {
     var target = event.target;
 
@@ -262,5 +287,6 @@
 
   setHistoryOpen(false);
   renderHistory();
+  syncPhoneInputMode();
   updateDisplay();
 })();

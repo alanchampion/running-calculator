@@ -176,14 +176,20 @@
     for (var index = 0; index < historyEntries.length; index += 1) {
       var entry = historyEntries[index];
       var item = document.createElement("li");
-      var expression = document.createElement("p");
-      var result = document.createElement("p");
+      var expression = document.createElement("button");
+      var result = document.createElement("button");
 
       item.className = "history-list__item";
+      expression.type = "button";
       expression.className = "history-list__expression";
       expression.textContent = entry.expression;
+      expression.dataset.historyValue = entry.expression;
+      expression.setAttribute("aria-label", "Insert expression " + entry.expression);
+      result.type = "button";
       result.className = "history-list__result";
       result.textContent = "= " + calculatorCore.formatNumber(entry.value);
+      result.dataset.historyValue = getInsertableNumber(entry.value);
+      result.setAttribute("aria-label", "Insert value " + result.dataset.historyValue);
 
       item.append(expression, result);
       historyList.append(item);
@@ -339,6 +345,10 @@
     );
   }
 
+  function getInsertableNumber(value) {
+    return calculatorCore.formatNumber(value).replace(/,/g, "");
+  }
+
   function updateDisplay() {
     syncExpressionSelection();
 
@@ -366,8 +376,14 @@
   }
 
   function replaceSelection(value) {
-    var start = expressionInput.selectionStart;
-    var end = expressionInput.selectionEnd;
+    var start =
+      typeof expressionInput.selectionStart === "number"
+        ? expressionInput.selectionStart
+        : savedSelectionStart;
+    var end =
+      typeof expressionInput.selectionEnd === "number"
+        ? expressionInput.selectionEnd
+        : savedSelectionEnd;
     var existing = expressionInput.value;
 
     expressionInput.value =
@@ -379,6 +395,12 @@
     expressionInput.setSelectionRange(cursor, cursor);
     expressionInput.focus();
     updateDisplay();
+  }
+
+  function insertHistoryValue(value) {
+    expressionInput.focus();
+    expressionInput.setSelectionRange(savedSelectionStart, savedSelectionEnd);
+    replaceSelection(value);
   }
 
   function removeCharacter() {
@@ -476,6 +498,15 @@
   });
   historyToggle.addEventListener("click", function () {
     setHistoryOpen(historyPanel.hidden);
+  });
+  historyList.addEventListener("click", function (event) {
+    var target = event.target;
+
+    if (!(target instanceof HTMLButtonElement) || !target.dataset.historyValue) {
+      return;
+    }
+
+    insertHistoryValue(target.dataset.historyValue);
   });
 
   if (phoneKeyboardMedia) {

@@ -3,6 +3,7 @@
 
   var calculatorCore = window.CalculatorCore;
   var calculatorStage = document.getElementById("calculator-stage");
+  var expressionPanel = document.getElementById("expression-panel");
   var expressionInput = document.getElementById("expression");
   var resultOutput = document.getElementById("result");
   var statusMessage = document.getElementById("status-message");
@@ -17,6 +18,7 @@
     typeof window.matchMedia === "function"
       ? window.matchMedia("(hover: none) and (pointer: coarse) and (max-width: 768px)")
       : null;
+  var expressionScrollTimeoutId = null;
   var historyEntries = [];
   var lastValidValue = 0;
 
@@ -97,24 +99,64 @@
     );
   }
 
-  function scrollExpressionIntoView() {
+  function performExpressionScroll() {
+    var scrollTarget = expressionPanel || expressionInput;
+
     if (!(phoneKeyboardMedia && phoneKeyboardMedia.matches)) {
       return;
     }
 
-    if (typeof expressionInput.scrollIntoView !== "function") {
+    if (!scrollTarget) {
+      return;
+    }
+
+    if (typeof scrollTarget.getBoundingClientRect === "function" &&
+      typeof window.scrollTo === "function") {
+      var rect = scrollTarget.getBoundingClientRect();
+      var currentScrollTop =
+        typeof window.pageYOffset === "number"
+          ? window.pageYOffset
+          : 0;
+      var nextScrollTop = Math.max(0, currentScrollTop + rect.top - 12);
+
+      window.scrollTo({
+        top: nextScrollTop,
+        behavior: "smooth"
+      });
+      return;
+    }
+
+    if (typeof scrollTarget.scrollIntoView !== "function") {
       return;
     }
 
     try {
-      expressionInput.scrollIntoView({
+      scrollTarget.scrollIntoView({
         behavior: "smooth",
-        block: "center",
+        block: "start",
         inline: "nearest"
       });
     } catch (error) {
-      expressionInput.scrollIntoView();
+      scrollTarget.scrollIntoView();
     }
+  }
+
+  function scrollExpressionIntoView() {
+    performExpressionScroll();
+
+    if (typeof window.setTimeout !== "function") {
+      return;
+    }
+
+    if (expressionScrollTimeoutId !== null &&
+      typeof window.clearTimeout === "function") {
+      window.clearTimeout(expressionScrollTimeoutId);
+    }
+
+    expressionScrollTimeoutId = window.setTimeout(function () {
+      expressionScrollTimeoutId = null;
+      performExpressionScroll();
+    }, 80);
   }
 
   function syncParenthesisButton() {

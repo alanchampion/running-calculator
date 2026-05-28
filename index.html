@@ -8,72 +8,108 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="calculator" aria-labelledby="calculator-title">
-        <header class="calculator__header">
-          <p class="eyebrow">Running Calculator</p>
-          <h1 id="calculator-title">Type the equation. Watch the total move.</h1>
-          <p class="supporting-text">
-            Supports addition, subtraction, multiplication, division,
-            exponents, decimals, and parentheses, including implicit
-            multiplication like 2(3) or (2)(3).
-          </p>
-        </header>
+      <div id="calculator-stage" class="calculator-stage" data-history-open="false">
+        <section class="calculator" aria-labelledby="calculator-title">
+          <header class="calculator__header">
+            <h1 id="calculator-title">Running Calculator</h1>
+            <br />
+            <p class="eyebrow">Type the equation. Watch the total move.</p>
+            <p class="supporting-text">
+              Supports addition, subtraction, multiplication, division,
+              exponents, decimals, and parentheses.
+            </p>
+          </header>
 
-        <label class="expression-panel" for="expression">
-          <span class="expression-panel__label">Expression</span>
-          <textarea
-            id="expression"
-            class="expression-panel__input"
-            rows="3"
-            placeholder="3575-41+2050-95-320-1920"
-            spellcheck="false"
-            aria-describedby="status-message helper-text"
-          ></textarea>
-        </label>
+          <label class="expression-panel" for="expression">
+            <span class="expression-panel__label">Expression</span>
+            <textarea
+              id="expression"
+              class="expression-panel__input"
+              rows="3"
+              placeholder="3575-41+2050-95-320-1920"
+              spellcheck="false"
+              aria-describedby="status-message helper-text"
+            ></textarea>
+          </label>
 
-        <section class="result-panel" aria-live="polite">
-          <p class="result-panel__label">Running total</p>
-          <output id="result" class="result-panel__value">0</output>
-          <p id="status-message" class="result-panel__status">
-            Start typing to calculate.
+          <section class="result-panel" aria-live="polite">
+            <p class="result-panel__label">Running total</p>
+            <output id="result" class="result-panel__value">0</output>
+            <p id="status-message" class="result-panel__status">
+              Start typing to calculate.
+            </p>
+          </section>
+
+          <div class="keypad" role="group" aria-label="Calculator keypad">
+            <button type="button" class="key key--action" data-action="clear">Clear</button>
+            <button type="button" class="key key--operator" data-action="parenthesis">()</button>
+            <button type="button" class="key key--operator" data-value="^">^</button>
+            <button type="button" class="key key--operator" data-value="/">/</button>
+
+            <button type="button" class="key" data-value="7">7</button>
+            <button type="button" class="key" data-value="8">8</button>
+            <button type="button" class="key" data-value="9">9</button>
+            <button type="button" class="key key--operator" data-value="*">*</button>
+
+            <button type="button" class="key" data-value="4">4</button>
+            <button type="button" class="key" data-value="5">5</button>
+            <button type="button" class="key" data-value="6">6</button>
+            <button type="button" class="key key--operator" data-value="-">-</button>
+
+            <button type="button" class="key" data-value="1">1</button>
+            <button type="button" class="key" data-value="2">2</button>
+            <button type="button" class="key" data-value="3">3</button>
+            <button type="button" class="key key--operator" data-value="+">+</button>
+
+            <button type="button" class="key" data-value="0">0</button>
+            <button type="button" class="key" data-value=".">.</button>
+            <button type="button" class="key key--action" data-action="backspace">Back</button>
+            <button type="button" class="key key--equals" data-action="evaluate">=</button>
+          </div>
+
+          <p id="helper-text" class="helper-text">
+            The <code>()</code> key chooses the parenthesis that fits next. You
+            can also type numbers, <code>+</code>, <code>-</code>, <code>*</code>,
+            <code>/</code>, <code>^</code>, <code>(</code>, <code>)</code>,
+            <code>.</code>, Enter, Backspace, and Escape from the keyboard.
+            Parentheses next to values multiply automatically, and committed
+            calculations land in history.
           </p>
         </section>
 
-        <div class="keypad" role="group" aria-label="Calculator keypad">
-          <button type="button" class="key key--action" data-action="clear">Clear</button>
-          <button type="button" class="key key--operator" data-action="parenthesis">()</button>
-          <button type="button" class="key key--operator" data-value="^">^</button>
-          <button type="button" class="key key--operator" data-value="/">/</button>
-
-          <button type="button" class="key" data-value="7">7</button>
-          <button type="button" class="key" data-value="8">8</button>
-          <button type="button" class="key" data-value="9">9</button>
-          <button type="button" class="key key--operator" data-value="*">*</button>
-
-          <button type="button" class="key" data-value="4">4</button>
-          <button type="button" class="key" data-value="5">5</button>
-          <button type="button" class="key" data-value="6">6</button>
-          <button type="button" class="key key--operator" data-value="-">-</button>
-
-          <button type="button" class="key" data-value="1">1</button>
-          <button type="button" class="key" data-value="2">2</button>
-          <button type="button" class="key" data-value="3">3</button>
-          <button type="button" class="key key--operator" data-value="+">+</button>
-
-          <button type="button" class="key" data-value="0">0</button>
-          <button type="button" class="key" data-value=".">.</button>
-          <button type="button" class="key key--action" data-action="backspace">Back</button>
-          <button type="button" class="key key--equals" data-action="evaluate">=</button>
-        </div>
-
-        <p id="helper-text" class="helper-text">
-          The <code>()</code> key chooses the parenthesis that fits next. You
-          can also type numbers, <code>+</code>, <code>-</code>, <code>*</code>,
-          <code>/</code>, <code>^</code>, <code>(</code>, <code>)</code>,
-          <code>.</code>, Enter, Backspace, and Escape from the keyboard.
-          Parentheses next to values multiply automatically.
-        </p>
-      </section>
+        <aside id="history-drawer" class="history-drawer" data-open="false">
+          <button
+            id="history-toggle"
+            class="history-drawer__toggle"
+            type="button"
+            aria-controls="history-panel"
+            aria-expanded="false"
+            aria-label="Expand history"
+          >
+            History
+          </button>
+          <section
+            id="history-panel"
+            class="history-panel"
+            aria-labelledby="history-title"
+            hidden
+          >
+            <div class="history-panel__header">
+              <h2 id="history-title" class="history-panel__title">History</h2>
+              <p class="history-panel__subtitle">Saved when you press = or Enter.</p>
+            </div>
+            <p id="history-empty" class="history-panel__empty">
+              Press = or Enter to save a calculation.
+            </p>
+            <ul
+              id="history-list"
+              class="history-list"
+              aria-live="polite"
+              aria-label="Calculation history"
+            ></ul>
+          </section>
+        </aside>
+      </div>
     </main>
 
     <script src="calculator.js"></script>

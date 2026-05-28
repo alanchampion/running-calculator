@@ -2,11 +2,18 @@
   "use strict";
 
   var calculatorCore = window.CalculatorCore;
+  var calculatorStage = document.getElementById("calculator-stage");
   var expressionInput = document.getElementById("expression");
   var resultOutput = document.getElementById("result");
   var statusMessage = document.getElementById("status-message");
+  var historyDrawer = document.getElementById("history-drawer");
+  var historyToggle = document.getElementById("history-toggle");
+  var historyPanel = document.getElementById("history-panel");
+  var historyList = document.getElementById("history-list");
+  var historyEmptyState = document.getElementById("history-empty");
   var keypad = document.querySelector(".keypad");
   var parenthesisButton = keypad.querySelector('[data-action="parenthesis"]');
+  var historyEntries = [];
   var lastValidValue = 0;
 
   function setStatus(message, tone) {
@@ -20,6 +27,57 @@
     if (tone === "error") {
       statusMessage.classList.add("is-error");
     }
+  }
+
+  function renderHistory() {
+    historyList.textContent = "";
+    historyEmptyState.hidden = historyEntries.length > 0;
+
+    for (var index = 0; index < historyEntries.length; index += 1) {
+      var entry = historyEntries[index];
+      var item = document.createElement("li");
+      var expression = document.createElement("p");
+      var result = document.createElement("p");
+
+      item.className = "history-list__item";
+      expression.className = "history-list__expression";
+      expression.textContent = entry.expression;
+      result.className = "history-list__result";
+      result.textContent = "= " + calculatorCore.formatNumber(entry.value);
+
+      item.append(expression, result);
+      historyList.append(item);
+    }
+  }
+
+  function addHistoryEntry(expression, value) {
+    historyEntries.unshift({
+      expression: expression,
+      value: value
+    });
+    renderHistory();
+
+    if (historyEntries.length === 1) {
+      setHistoryOpen(true);
+    }
+  }
+
+  function syncHistoryDrawer() {
+    var isOpen = !historyPanel.hidden;
+    var openState = String(isOpen);
+
+    calculatorStage.dataset.historyOpen = openState;
+    historyDrawer.dataset.open = openState;
+    historyToggle.setAttribute("aria-expanded", openState);
+    historyToggle.setAttribute(
+      "aria-label",
+      isOpen ? "Collapse history" : "Expand history"
+    );
+  }
+
+  function setHistoryOpen(nextOpen) {
+    historyPanel.hidden = !nextOpen;
+    syncHistoryDrawer();
   }
 
   function syncParenthesisButton() {
@@ -136,7 +194,10 @@
       return;
     }
 
+    var committedExpression = expressionInput.value.trim();
     var nextValue = String(state.value);
+
+    addHistoryEntry(committedExpression, state.value);
     expressionInput.value = nextValue;
     expressionInput.setSelectionRange(nextValue.length, nextValue.length);
     expressionInput.focus();
@@ -160,6 +221,9 @@
   });
   expressionInput.addEventListener("keyup", syncParenthesisButton);
   expressionInput.addEventListener("select", syncParenthesisButton);
+  historyToggle.addEventListener("click", function () {
+    setHistoryOpen(historyPanel.hidden);
+  });
 
   keypad.addEventListener("click", function (event) {
     var target = event.target;
@@ -196,5 +260,7 @@
     }
   });
 
+  setHistoryOpen(false);
+  renderHistory();
   updateDisplay();
 })();

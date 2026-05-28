@@ -97,6 +97,26 @@
     );
   }
 
+  function scrollExpressionIntoView() {
+    if (!(phoneKeyboardMedia && phoneKeyboardMedia.matches)) {
+      return;
+    }
+
+    if (typeof expressionInput.scrollIntoView !== "function") {
+      return;
+    }
+
+    try {
+      expressionInput.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest"
+      });
+    } catch (error) {
+      expressionInput.scrollIntoView();
+    }
+  }
+
   function syncParenthesisButton() {
     var start = expressionInput.selectionStart;
     var end = expressionInput.selectionEnd;
@@ -222,8 +242,14 @@
   }
 
   expressionInput.addEventListener("input", updateDisplay);
-  expressionInput.addEventListener("click", syncParenthesisButton);
-  expressionInput.addEventListener("focus", syncParenthesisButton);
+  expressionInput.addEventListener("click", function () {
+    syncParenthesisButton();
+    scrollExpressionIntoView();
+  });
+  expressionInput.addEventListener("focus", function () {
+    syncParenthesisButton();
+    scrollExpressionIntoView();
+  });
   expressionInput.addEventListener("keydown", function (event) {
     if (event.key === "Enter") {
       event.preventDefault();

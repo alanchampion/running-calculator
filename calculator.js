@@ -316,7 +316,28 @@
       return 0;
     }
 
-    return Number(value.toFixed(12));
+    var roundedValue = Number(value.toPrecision(15));
+
+    if (Object.is(roundedValue, -0)) {
+      return 0;
+    }
+
+    return Number(serializeRoundedNumber(roundedValue));
+  }
+
+  function serializeRoundedNumber(value) {
+    var fixedValue = value.toFixed(12);
+
+    if (fixedValue.indexOf(".") === -1) {
+      return fixedValue;
+    }
+
+    fixedValue = fixedValue.replace(/0+$/, "").replace(/\.$/, "");
+    return fixedValue === "-0" ? "0" : fixedValue;
+  }
+
+  function serializeNumber(value) {
+    return serializeRoundedNumber(normalizeNumber(value));
   }
 
   function evaluateExpression(expression) {
@@ -374,7 +395,8 @@
     evaluateExpression: evaluateExpression,
     formatNumber: formatNumber,
     getExpressionState: getExpressionState,
-    getSmartParenthesisValue: getSmartParenthesisValue
+    getSmartParenthesisValue: getSmartParenthesisValue,
+    serializeNumber: serializeNumber
   };
 
   global.CalculatorCore = api;

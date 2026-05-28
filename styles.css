@@ -350,8 +350,49 @@ textarea {
   background: var(--surface);
 }
 
+.helper-module {
+  border: 1px solid rgba(110, 168, 254, 0.12);
+  border-radius: 18px;
+  background: rgba(9, 17, 32, 0.4);
+  overflow: hidden;
+}
+
+.helper-module[open] {
+  background: rgba(9, 17, 32, 0.55);
+}
+
+.helper-module__summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  color: var(--accent);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.helper-module__summary::-webkit-details-marker {
+  display: none;
+}
+
+.helper-module__summary::after {
+  content: "+";
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.helper-module[open] .helper-module__summary::after {
+  content: "-";
+}
+
 .helper-text {
   margin: 0;
+  padding: 0 18px 18px;
+  border-top: 1px solid rgba(110, 168, 254, 0.12);
   color: var(--muted);
   line-height: 1.5;
 }

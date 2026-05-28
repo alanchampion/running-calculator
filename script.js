@@ -140,7 +140,7 @@
 
   function getEmptyStatusMessage() {
     return phoneKeyboardMedia && phoneKeyboardMedia.matches
-      ? "Use the calculator pad to build an expression."
+      ? "Use the calculator pad."
       : "Start typing to calculate.";
   }
 

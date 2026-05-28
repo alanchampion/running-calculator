@@ -28,10 +28,6 @@
             <h1 id="calculator-title">Running Calculator</h1>
             <br />
             <p class="eyebrow">Type the equation. Watch the total move.</p>
-            <p class="supporting-text">
-              Supports addition, subtraction, multiplication, division,
-              exponents, decimals, and parentheses.
-            </p>
           </header>
 
           <div id="expression-panel" class="expression-panel">
@@ -87,15 +83,18 @@
             <button type="button" class="key key--equals" data-action="evaluate">=</button>
           </div>
 
-          <p id="helper-text" class="helper-text">
-            The <code>()</code> key chooses the parenthesis that fits next. You
-            can also type numbers, <code>+</code>, <code>-</code>, <code>*</code>,
-            <code>/</code>, <code>^</code>, <code>(</code>, <code>)</code>,
-            <code>.</code>, Enter, Backspace, and Escape from the keyboard.
-            On phones, use the calculator pad without opening the on-screen
-            keyboard. Parentheses next to values multiply automatically, and
-            committed calculations land in history.
-          </p>
+          <details class="helper-module">
+            <summary class="helper-module__summary">Tips &amp; shortcuts</summary>
+            <p id="helper-text" class="helper-text">
+              The <code>()</code> key chooses the parenthesis that fits next. You
+              can also type numbers, <code>+</code>, <code>-</code>, <code>*</code>,
+              <code>/</code>, <code>^</code>, <code>(</code>, <code>)</code>,
+              <code>.</code>, Enter, Backspace, and Escape from the keyboard.
+              On phones, use the calculator pad without opening the on-screen
+              keyboard. Parentheses next to values multiply automatically, and
+              committed calculations land in history.
+            </p>
+          </details>
         </section>
 
         <aside id="history-drawer" class="history-drawer" data-open="false">

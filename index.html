@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Running Calculator</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="shortcut icon" href="favicon.png" />
   </head>
   <body>
     <main class="app-shell">
@@ -20,8 +22,10 @@
             </p>
           </header>
 
-          <label id="expression-panel" class="expression-panel" for="expression">
-            <span class="expression-panel__label">Expression</span>
+          <div id="expression-panel" class="expression-panel">
+            <div class="expression-panel__header">
+              <label class="expression-panel__label" for="expression">Expression</label>
+            </div>
             <textarea
               id="expression"
               class="expression-panel__input"
@@ -34,7 +38,7 @@
               spellcheck="false"
               aria-describedby="status-message helper-text"
             ></textarea>
-          </label>
+          </div>
 
           <section class="result-panel" aria-live="polite">
             <p class="result-panel__label">Running total</p>
@@ -76,9 +80,9 @@
             can also type numbers, <code>+</code>, <code>-</code>, <code>*</code>,
             <code>/</code>, <code>^</code>, <code>(</code>, <code>)</code>,
             <code>.</code>, Enter, Backspace, and Escape from the keyboard.
-            On phones, the system keyboard stays hidden so the calculator pad
-            handles input. Parentheses next to values multiply automatically,
-            and committed calculations land in history.
+            On phones, you can use the calculator pad or type directly into the
+            expression field. Parentheses next to values multiply
+            automatically, and committed calculations land in history.
           </p>
         </section>
 
@@ -115,6 +119,7 @@
           </section>
         </aside>
       </div>
+
     </main>
 
     <script src="calculator.js"></script>

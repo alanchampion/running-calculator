@@ -108,6 +108,14 @@ textarea {
   font-weight: 600;
 }
 
+.expression-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .history-drawer {
   position: absolute;
   top: 0;

@@ -19,6 +19,8 @@
       ? window.matchMedia("(hover: none) and (pointer: coarse) and (max-width: 768px)")
       : null;
   var expressionScrollTimeoutId = null;
+  var savedSelectionStart = 0;
+  var savedSelectionEnd = 0;
   var historyEntries = [];
   var lastValidValue = 0;
 
@@ -86,15 +88,30 @@
     syncHistoryDrawer();
   }
 
-  function syncPhoneInputMode() {
-    var hidePhoneKeyboard = !!(phoneKeyboardMedia && phoneKeyboardMedia.matches);
+  function syncExpressionSelection() {
+    var start =
+      typeof expressionInput.selectionStart === "number"
+        ? expressionInput.selectionStart
+        : savedSelectionStart;
+    var end =
+      typeof expressionInput.selectionEnd === "number"
+        ? expressionInput.selectionEnd
+        : savedSelectionEnd;
+    var maxLength = expressionInput.value.length;
 
-    expressionInput.readOnly = hidePhoneKeyboard;
-    expressionInput.setAttribute("inputmode", hidePhoneKeyboard ? "none" : "text");
+    savedSelectionStart = Math.max(0, Math.min(maxLength, start));
+    savedSelectionEnd = Math.max(savedSelectionStart, Math.min(maxLength, end));
+  }
+
+  function syncPhoneInputMode() {
+    var isPhoneLayout = !!(phoneKeyboardMedia && phoneKeyboardMedia.matches);
+
+    expressionInput.readOnly = false;
+    expressionInput.setAttribute("inputmode", "text");
     expressionInput.setAttribute(
       "aria-label",
-      hidePhoneKeyboard
-        ? "Expression. Use the calculator buttons to enter values on mobile."
+      isPhoneLayout
+        ? "Expression. Type directly or use the calculator buttons on mobile."
         : "Expression"
     );
   }
@@ -180,6 +197,8 @@
   }
 
   function updateDisplay() {
+    syncExpressionSelection();
+
     var state = calculatorCore.getExpressionState(expressionInput.value);
 
     if (state.status === "valid") {
@@ -285,10 +304,12 @@
 
   expressionInput.addEventListener("input", updateDisplay);
   expressionInput.addEventListener("click", function () {
+    syncExpressionSelection();
     syncParenthesisButton();
     scrollExpressionIntoView();
   });
   expressionInput.addEventListener("focus", function () {
+    syncExpressionSelection();
     syncParenthesisButton();
     scrollExpressionIntoView();
   });
@@ -305,7 +326,11 @@
     }
   });
   expressionInput.addEventListener("keyup", syncParenthesisButton);
-  expressionInput.addEventListener("select", syncParenthesisButton);
+  expressionInput.addEventListener("keyup", syncExpressionSelection);
+  expressionInput.addEventListener("select", function () {
+    syncExpressionSelection();
+    syncParenthesisButton();
+  });
   historyToggle.addEventListener("click", function () {
     setHistoryOpen(historyPanel.hidden);
   });

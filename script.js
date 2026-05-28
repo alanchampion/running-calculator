@@ -24,6 +24,24 @@
   var historyEntries = [];
   var lastValidValue = 0;
 
+  function registerServiceWorker() {
+    var host = window.location.hostname;
+    var isLocalhost =
+      host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+    var isSupportedProtocol = window.location.protocol === "https:" ||
+      (window.location.protocol === "http:" && isLocalhost);
+
+    if (!("serviceWorker" in navigator) || !isSupportedProtocol) {
+      return;
+    }
+
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("./sw.js").catch(function (error) {
+        console.error("Service worker registration failed.", error);
+      });
+    });
+  }
+
   function setStatus(message, tone) {
     statusMessage.textContent = message;
     statusMessage.classList.remove("is-warning", "is-error");
@@ -380,6 +398,7 @@
 
   setHistoryOpen(false);
   renderHistory();
+  registerServiceWorker();
   syncPhoneInputMode();
   updateDisplay();
 })();

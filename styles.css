@@ -20,6 +20,10 @@
   --drawer-width: 290px;
   --drawer-expanded-width: calc(var(--drawer-tab-size) + var(--drawer-width));
   --page-padding: 24px;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
 }
 
 * {
@@ -29,6 +33,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at top, rgba(59, 130, 246, 0.18), transparent 38%),
     linear-gradient(180deg, #091120 0%, var(--bg) 100%);
@@ -42,9 +47,20 @@ textarea {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: var(--page-padding);
+  padding:
+    calc(var(--page-padding) + var(--safe-area-top))
+    calc(var(--page-padding) + var(--safe-area-right))
+    calc(var(--page-padding) + var(--safe-area-bottom))
+    calc(var(--page-padding) + var(--safe-area-left));
+}
+
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: none;
+  }
 }
 
 .calculator-stage {

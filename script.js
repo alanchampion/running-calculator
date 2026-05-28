@@ -124,14 +124,24 @@
   function syncPhoneInputMode() {
     var isPhoneLayout = !!(phoneKeyboardMedia && phoneKeyboardMedia.matches);
 
-    expressionInput.readOnly = false;
-    expressionInput.setAttribute("inputmode", "text");
+    expressionInput.readOnly = isPhoneLayout;
+    expressionInput.setAttribute("inputmode", isPhoneLayout ? "none" : "text");
     expressionInput.setAttribute(
       "aria-label",
       isPhoneLayout
-        ? "Expression. Type directly or use the calculator buttons on mobile."
+        ? "Expression. Use the calculator buttons on mobile without opening the keyboard."
         : "Expression"
     );
+
+    if (expressionInput.value.trim() === "") {
+      setStatus(getEmptyStatusMessage());
+    }
+  }
+
+  function getEmptyStatusMessage() {
+    return phoneKeyboardMedia && phoneKeyboardMedia.matches
+      ? "Use the calculator pad to build an expression."
+      : "Start typing to calculate.";
   }
 
   function performExpressionScroll() {
@@ -226,7 +236,7 @@
     } else if (state.status === "empty") {
       lastValidValue = 0;
       resultOutput.textContent = "0";
-      setStatus("Start typing to calculate.");
+      setStatus(getEmptyStatusMessage());
     } else {
       resultOutput.textContent = calculatorCore.formatNumber(lastValidValue);
 

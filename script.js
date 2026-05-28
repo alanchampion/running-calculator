@@ -21,7 +21,10 @@
   var expressionScrollTimeoutId = null;
   var savedSelectionStart = 0;
   var savedSelectionEnd = 0;
+  var HISTORY_STORAGE_KEY = "running-calculator-history";
   var historyEntries = [];
+  var historyStorage = null;
+  var hasResolvedHistoryStorage = false;
   var lastValidValue = 0;
 
   function registerServiceWorker() {
@@ -55,6 +58,117 @@
     }
   }
 
+  function getHistoryStorage() {
+    if (hasResolvedHistoryStorage) {
+      return historyStorage;
+    }
+
+    hasResolvedHistoryStorage = true;
+
+    try {
+      historyStorage = window.localStorage;
+    } catch (error) {
+      console.error("Calculation history storage is unavailable.", error);
+      historyStorage = null;
+    }
+
+    return historyStorage;
+  }
+
+  function clearSavedHistory() {
+    var storage = getHistoryStorage();
+
+    if (!storage) {
+      return;
+    }
+
+    try {
+      storage.removeItem(HISTORY_STORAGE_KEY);
+    } catch (error) {
+      console.error("Failed to clear saved calculation history.", error);
+    }
+  }
+
+  function isValidHistoryEntry(entry) {
+    return !!entry &&
+      typeof entry.expression === "string" &&
+      entry.expression.trim() !== "" &&
+      typeof entry.value === "number" &&
+      isFinite(entry.value);
+  }
+
+  function saveHistory() {
+    var storage = getHistoryStorage();
+
+    if (!storage) {
+      return;
+    }
+
+    try {
+      storage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(historyEntries));
+    } catch (error) {
+      console.error("Failed to save calculation history.", error);
+    }
+  }
+
+  function loadHistory() {
+    var storage = getHistoryStorage();
+    var savedHistory = null;
+    var parsedHistory = null;
+    var nextHistoryEntries = [];
+    var foundInvalidEntries = false;
+
+    if (!storage) {
+      return;
+    }
+
+    try {
+      savedHistory = storage.getItem(HISTORY_STORAGE_KEY);
+    } catch (error) {
+      console.error("Failed to read saved calculation history.", error);
+      return;
+    }
+
+    if (!savedHistory) {
+      return;
+    }
+
+    try {
+      parsedHistory = JSON.parse(savedHistory);
+    } catch (error) {
+      console.error("Saved calculation history could not be parsed.", error);
+      clearSavedHistory();
+      return;
+    }
+
+    if (!Array.isArray(parsedHistory)) {
+      console.error("Saved calculation history has an invalid format.");
+      clearSavedHistory();
+      return;
+    }
+
+    for (var index = 0; index < parsedHistory.length; index += 1) {
+      var entry = parsedHistory[index];
+
+      if (!isValidHistoryEntry(entry)) {
+        foundInvalidEntries = true;
+        continue;
+      }
+
+      nextHistoryEntries.push({
+        expression: entry.expression,
+        value: entry.value
+      });
+    }
+
+    historyEntries = nextHistoryEntries;
+
+    if (foundInvalidEntries) {
+      console.error("Saved calculation history contained invalid entries and was repaired.");
+      saveHistory();
+    }
+  }
+
   function renderHistory() {
     historyList.textContent = "";
     historyEmptyState.hidden = historyEntries.length > 0;
@@ -81,6 +195,7 @@
       expression: expression,
       value: value
     });
+    saveHistory();
     renderHistory();
 
     if (historyEntries.length === 1) {
@@ -407,6 +522,7 @@
   });
 
   setHistoryOpen(false);
+  loadHistory();
   renderHistory();
   registerServiceWorker();
   syncPhoneInputMode();

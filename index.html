@@ -115,8 +115,18 @@
             hidden
           >
             <div class="history-panel__header">
-              <h2 id="history-title" class="history-panel__title">History</h2>
-              <p class="history-panel__subtitle">Saved when you press = or Enter.</p>
+              <div class="history-panel__copy">
+                <h2 id="history-title" class="history-panel__title">History</h2>
+                <p class="history-panel__subtitle">Saved when you press = or Enter.</p>
+              </div>
+              <button
+                id="history-clear"
+                class="history-panel__action"
+                type="button"
+                aria-controls="history-list"
+              >
+                Clear all
+              </button>
             </div>
             <p id="history-empty" class="history-panel__empty">
               Press = or Enter to save a calculation.

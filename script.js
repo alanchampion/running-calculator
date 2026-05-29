@@ -13,6 +13,11 @@
   var historyList = document.getElementById("history-list");
   var historyEmptyState = document.getElementById("history-empty");
   var historyClearButton = document.getElementById("history-clear");
+  var savedToggle = document.getElementById("saved-toggle");
+  var savedPanel = document.getElementById("saved-panel");
+  var savedList = document.getElementById("saved-list");
+  var savedEmptyState = document.getElementById("saved-empty");
+  var savedClearButton = document.getElementById("saved-clear");
   var keypad = document.querySelector(".keypad");
   var parenthesisButton = keypad.querySelector('[data-action="parenthesis"]');
   var phoneKeyboardMedia =
@@ -23,7 +28,36 @@
   var savedSelectionStart = 0;
   var savedSelectionEnd = 0;
   var HISTORY_STORAGE_KEY = "running-calculator-history";
-  var historyEntries = [];
+  var SAVED_STORAGE_KEY = "running-calculator-saved";
+  var entryCollections = {
+    history: {
+      key: "history",
+      title: "History",
+      storageKey: HISTORY_STORAGE_KEY,
+      toggle: historyToggle,
+      panel: historyPanel,
+      listElement: historyList,
+      emptyStateElement: historyEmptyState,
+      clearButton: historyClearButton,
+      entries: []
+    },
+    saved: {
+      key: "saved",
+      title: "Saved",
+      storageKey: SAVED_STORAGE_KEY,
+      toggle: savedToggle,
+      panel: savedPanel,
+      listElement: savedList,
+      emptyStateElement: savedEmptyState,
+      clearButton: savedClearButton,
+      entries: []
+    }
+  };
+  var activeDrawerName = "";
+  var menuPopover = null;
+  var activeMenuCollectionName = "";
+  var activeMenuIndex = -1;
+  var activeMenuToggle = null;
   var historyStorage = null;
   var hasResolvedHistoryStorage = false;
   var lastValidValue = "0";
@@ -76,7 +110,21 @@
     return historyStorage;
   }
 
-  function clearSavedHistory() {
+  function getCollection(collectionName) {
+    return entryCollections[collectionName] || null;
+  }
+
+  function getCollectionLogLabel(collection) {
+    return collection.key === "history"
+      ? "calculation history"
+      : "saved calculations";
+  }
+
+  function isCollectionDrawerAvailable(collection) {
+    return !!(collection && collection.toggle && collection.panel);
+  }
+
+  function clearStoredEntries(collection) {
     var storage = getHistoryStorage();
 
     if (!storage) {
@@ -84,22 +132,32 @@
     }
 
     try {
-      storage.removeItem(HISTORY_STORAGE_KEY);
+      storage.removeItem(collection.storageKey);
     } catch (error) {
-      console.error("Failed to clear saved calculation history.", error);
+      console.error("Failed to clear saved " + getCollectionLogLabel(collection) + ".", error);
     }
   }
 
-  function persistHistory() {
-    if (historyEntries.length === 0) {
-      clearSavedHistory();
+  function persistEntries(collection) {
+    var storage = getHistoryStorage();
+
+    if (!storage) {
       return;
     }
 
-    saveHistory();
+    if (collection.entries.length === 0) {
+      clearStoredEntries(collection);
+      return;
+    }
+
+    try {
+      storage.setItem(collection.storageKey, JSON.stringify(collection.entries));
+    } catch (error) {
+      console.error("Failed to save " + getCollectionLogLabel(collection) + ".", error);
+    }
   }
 
-  function normalizeHistoryEntry(entry) {
+  function normalizeEntry(entry) {
     var normalizedValue = null;
 
     if (!entry ||
@@ -120,161 +178,436 @@
     };
   }
 
-  function saveHistory() {
+  function loadEntries(collection) {
     var storage = getHistoryStorage();
+    var savedEntries = null;
+    var parsedEntries = null;
+    var nextEntries = [];
+    var repairedEntries = false;
 
     if (!storage) {
       return;
     }
 
     try {
-      storage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(historyEntries));
+      savedEntries = storage.getItem(collection.storageKey);
     } catch (error) {
-      console.error("Failed to save calculation history.", error);
+      console.error("Failed to read saved " + getCollectionLogLabel(collection) + ".", error);
+      return;
     }
-  }
 
-  function loadHistory() {
-    var storage = getHistoryStorage();
-    var savedHistory = null;
-    var parsedHistory = null;
-    var nextHistoryEntries = [];
-    var repairedHistory = false;
-
-    if (!storage) {
+    if (!savedEntries) {
       return;
     }
 
     try {
-      savedHistory = storage.getItem(HISTORY_STORAGE_KEY);
+      parsedEntries = JSON.parse(savedEntries);
     } catch (error) {
-      console.error("Failed to read saved calculation history.", error);
+      console.error("Saved " + getCollectionLogLabel(collection) + " could not be parsed.", error);
+      clearStoredEntries(collection);
       return;
     }
 
-    if (!savedHistory) {
+    if (!Array.isArray(parsedEntries)) {
+      console.error("Saved " + getCollectionLogLabel(collection) + " has an invalid format.");
+      clearStoredEntries(collection);
       return;
     }
 
-    try {
-      parsedHistory = JSON.parse(savedHistory);
-    } catch (error) {
-      console.error("Saved calculation history could not be parsed.", error);
-      clearSavedHistory();
-      return;
-    }
-
-    if (!Array.isArray(parsedHistory)) {
-      console.error("Saved calculation history has an invalid format.");
-      clearSavedHistory();
-      return;
-    }
-
-    for (var index = 0; index < parsedHistory.length; index += 1) {
-      var normalizedEntry = normalizeHistoryEntry(parsedHistory[index]);
+    for (var index = 0; index < parsedEntries.length; index += 1) {
+      var normalizedEntry = normalizeEntry(parsedEntries[index]);
 
       if (!normalizedEntry) {
-        repairedHistory = true;
+        repairedEntries = true;
         continue;
       }
 
-      if (normalizedEntry.value !== parsedHistory[index].value) {
-        repairedHistory = true;
+      if (normalizedEntry.value !== parsedEntries[index].value) {
+        repairedEntries = true;
       }
 
-      nextHistoryEntries.push(normalizedEntry);
+      nextEntries.push(normalizedEntry);
     }
 
-    historyEntries = nextHistoryEntries;
+    collection.entries = nextEntries;
 
-    if (repairedHistory) {
-      console.error("Saved calculation history contained invalid entries and was repaired.");
-      persistHistory();
+    if (repairedEntries) {
+      console.error("Saved " + getCollectionLogLabel(collection) + " contained invalid entries and was repaired.");
+      persistEntries(collection);
     }
   }
 
-  function renderHistory() {
-    historyList.textContent = "";
-    historyEmptyState.hidden = historyEntries.length > 0;
+  function createEntryCopy(entry) {
+    return {
+      expression: entry.expression,
+      value: entry.value
+    };
+  }
 
-    if (historyClearButton) {
-      historyClearButton.disabled = historyEntries.length === 0;
+  function isSameEntry(leftEntry, rightEntry) {
+    return !!leftEntry &&
+      !!rightEntry &&
+      leftEntry.expression === rightEntry.expression &&
+      leftEntry.value === rightEntry.value;
+  }
+
+  function hasSavedEntry(entry) {
+    var savedCollection = getCollection("saved");
+
+    for (var index = 0; index < savedCollection.entries.length; index += 1) {
+      if (isSameEntry(savedCollection.entries[index], entry)) {
+        return true;
+      }
     }
 
-    for (var index = 0; index < historyEntries.length; index += 1) {
-      var entry = historyEntries[index];
+    return false;
+  }
+
+  function renderCollection(collection) {
+    var listElement = collection.listElement;
+    var emptyStateElement = collection.emptyStateElement;
+    var clearButton = collection.clearButton;
+
+    if (listElement) {
+      listElement.textContent = "";
+    }
+
+    if (emptyStateElement) {
+      emptyStateElement.hidden = collection.entries.length > 0;
+    }
+
+    if (clearButton) {
+      clearButton.disabled = collection.entries.length === 0;
+    }
+
+    if (!listElement) {
+      return;
+    }
+
+    for (var index = 0; index < collection.entries.length; index += 1) {
+      var entry = collection.entries[index];
       var item = document.createElement("li");
       var row = document.createElement("div");
       var expression = document.createElement("button");
       var result = document.createElement("button");
-      var menu = document.createElement("details");
-      var menuToggle = document.createElement("summary");
-      var menuPanel = document.createElement("div");
-      var deleteButton = document.createElement("button");
+      var menu = document.createElement("div");
+      var menuToggle = document.createElement("button");
 
       item.className = "history-list__item";
       row.className = "history-list__row";
       expression.type = "button";
       expression.className = "history-list__expression";
       expression.textContent = entry.expression;
-      expression.dataset.historyValue = entry.expression;
+      expression.dataset.entryValue = entry.expression;
       expression.setAttribute("aria-label", "Insert expression " + entry.expression);
       result.type = "button";
       result.className = "history-list__result";
       result.textContent = "= " + calculatorCore.formatNumber(entry.value);
-      result.dataset.historyValue = getInsertableNumber(entry.value);
-      result.setAttribute("aria-label", "Insert value " + result.dataset.historyValue);
+      result.dataset.entryValue = getInsertableNumber(entry.value);
+      result.setAttribute("aria-label", "Insert value " + result.dataset.entryValue);
       menu.className = "history-list__menu";
+      menu.dataset.collectionName = collection.key;
       menuToggle.className = "history-list__menu-toggle";
+      menuToggle.type = "button";
       menuToggle.textContent = "...";
-      menuToggle.setAttribute("aria-label", "History item options for " + entry.expression);
-      menuPanel.className = "history-list__menu-panel";
-      deleteButton.type = "button";
-      deleteButton.className = "history-list__menu-action";
-      deleteButton.textContent = "Delete";
-      deleteButton.dataset.historyAction = "delete";
-      deleteButton.dataset.historyIndex = String(index);
-      deleteButton.setAttribute("aria-label", "Delete history item " + entry.expression);
-
-      menuPanel.append(deleteButton);
-      menu.append(menuToggle, menuPanel);
+      menuToggle.dataset.entryMenu = "toggle";
+      menuToggle.dataset.entryIndex = String(index);
+      menuToggle.setAttribute("aria-expanded", "false");
+      menuToggle.setAttribute("aria-haspopup", "menu");
+      menuToggle.setAttribute("aria-label", collection.title + " item options for " + entry.expression);
+      menu.append(menuToggle);
       row.append(expression, menu);
       item.append(row, result);
-      historyList.append(item);
+      listElement.append(item);
     }
+  }
+
+  function renderCollections() {
+    renderCollection(getCollection("history"));
+    renderCollection(getCollection("saved"));
+  }
+
+  function ensureMenuPopover() {
+    if (menuPopover || !historyDrawer) {
+      return;
+    }
+
+    menuPopover = document.createElement("div");
+    menuPopover.className = "history-drawer__menu-popover";
+    menuPopover.hidden = true;
+    historyDrawer.append(menuPopover);
+  }
+
+  function getRectHeight(rect) {
+    if (!rect || typeof rect.height !== "number") {
+      return 0;
+    }
+
+    return rect.height;
+  }
+
+  function getRectWidth(rect) {
+    if (!rect || typeof rect.width !== "number") {
+      return 0;
+    }
+
+    return rect.width;
+  }
+
+  function isMenuToggleButton(target) {
+    return !!(target && target.dataset && target.dataset.entryMenu === "toggle");
+  }
+
+  function isNodeWithin(node, ancestor) {
+    while (node) {
+      if (node === ancestor) {
+        return true;
+      }
+
+      node = node.parentElement || null;
+    }
+
+    return false;
+  }
+
+  function getMenuPopoverHeight() {
+    if (!menuPopover) {
+      return 0;
+    }
+
+    if (typeof menuPopover.offsetHeight === "number" && menuPopover.offsetHeight > 0) {
+      return menuPopover.offsetHeight;
+    }
+
+    if (typeof menuPopover.getBoundingClientRect === "function") {
+      return getRectHeight(menuPopover.getBoundingClientRect());
+    }
+
+    return 0;
+  }
+
+  function getMenuPopoverWidth() {
+    if (!menuPopover) {
+      return 0;
+    }
+
+    if (typeof menuPopover.offsetWidth === "number" && menuPopover.offsetWidth > 0) {
+      return menuPopover.offsetWidth;
+    }
+
+    if (typeof menuPopover.getBoundingClientRect === "function") {
+      return getRectWidth(menuPopover.getBoundingClientRect());
+    }
+
+    return 0;
+  }
+
+  function setMenuToggleExpanded(menuToggle, isExpanded) {
+    if (!menuToggle) {
+      return;
+    }
+
+    menuToggle.setAttribute("aria-expanded", String(isExpanded));
+  }
+
+  function closeEntryMenu() {
+    setMenuToggleExpanded(activeMenuToggle, false);
+    activeMenuCollectionName = "";
+    activeMenuIndex = -1;
+    activeMenuToggle = null;
+
+    if (!menuPopover) {
+      return;
+    }
+
+    menuPopover.hidden = true;
+    menuPopover.textContent = "";
+    menuPopover.style.top = "";
+    menuPopover.style.left = "";
+    menuPopover.style.visibility = "";
+  }
+
+  function addMenuPopoverAction(label, className, actionName, ariaLabel, isDisabled) {
+    var actionButton = document.createElement("button");
+
+    actionButton.type = "button";
+    actionButton.className = className;
+    actionButton.textContent = label;
+    actionButton.disabled = !!isDisabled;
+    actionButton.dataset.entryAction = actionName;
+    actionButton.setAttribute("aria-label", ariaLabel);
+    menuPopover.append(actionButton);
+  }
+
+  function populateMenuPopover(collectionName, index) {
+    var collection = getCollection(collectionName);
+    var entry = collection && collection.entries[index];
+    var isSavedAlready = false;
+
+    if (!menuPopover || !collection || !entry) {
+      return false;
+    }
+
+    menuPopover.textContent = "";
+    menuPopover.setAttribute("aria-label", collection.title + " item options");
+
+    if (collectionName === "history") {
+      isSavedAlready = hasSavedEntry(entry);
+
+      addMenuPopoverAction(
+        isSavedAlready ? "Saved" : "Save",
+        "history-list__menu-action history-list__menu-action--primary",
+        "save",
+        (isSavedAlready ? "Saved " : "Save ") + "history item " + entry.expression,
+        isSavedAlready
+      );
+    }
+
+    addMenuPopoverAction(
+      "Delete",
+      "history-list__menu-action",
+      "delete",
+      "Delete " + collection.title.toLowerCase() + " item " + entry.expression,
+      false
+    );
+
+    return true;
+  }
+
+  function positionMenuPopover(menuToggle) {
+    var drawerRect = null;
+    var toggleRect = null;
+    var popoverHeight = 0;
+    var popoverWidth = 0;
+    var margin = 12;
+    var gap = 6;
+    var nextTop = 0;
+    var nextLeft = 0;
+    var maxTop = 0;
+    var maxLeft = 0;
+
+    if (!historyDrawer ||
+      !menuPopover ||
+      typeof historyDrawer.getBoundingClientRect !== "function" ||
+      !menuToggle ||
+      typeof menuToggle.getBoundingClientRect !== "function") {
+      return;
+    }
+
+    drawerRect = historyDrawer.getBoundingClientRect();
+    toggleRect = menuToggle.getBoundingClientRect();
+    popoverHeight = getMenuPopoverHeight();
+    popoverWidth = getMenuPopoverWidth();
+    maxTop = Math.max(margin, drawerRect.height - popoverHeight - margin);
+    maxLeft = Math.max(margin, drawerRect.width - popoverWidth - margin);
+    nextTop = toggleRect.bottom - drawerRect.top + gap;
+
+    if (nextTop + popoverHeight > drawerRect.height - margin) {
+      nextTop = toggleRect.top - drawerRect.top - popoverHeight - gap;
+    }
+
+    nextTop = Math.max(margin, Math.min(nextTop, maxTop));
+    nextLeft = toggleRect.right - drawerRect.left - popoverWidth;
+    nextLeft = Math.max(margin, Math.min(nextLeft, maxLeft));
+
+    menuPopover.style.top = nextTop + "px";
+    menuPopover.style.left = nextLeft + "px";
+    menuPopover.style.visibility = "";
+  }
+
+  function openEntryMenu(collectionName, index, menuToggle) {
+    ensureMenuPopover();
+
+    if (!menuPopover) {
+      return;
+    }
+
+    if (activeMenuCollectionName === collectionName &&
+      activeMenuIndex === index &&
+      activeMenuToggle === menuToggle &&
+      !menuPopover.hidden) {
+      closeEntryMenu();
+      return;
+    }
+
+    closeEntryMenu();
+
+    if (!populateMenuPopover(collectionName, index)) {
+      return;
+    }
+
+    activeMenuCollectionName = collectionName;
+    activeMenuIndex = index;
+    activeMenuToggle = menuToggle;
+    setMenuToggleExpanded(menuToggle, true);
+    menuPopover.hidden = false;
+    menuPopover.style.top = "0px";
+    menuPopover.style.left = "0px";
+    menuPopover.style.visibility = "hidden";
+    positionMenuPopover(menuToggle);
   }
 
   function addHistoryEntry(expression, value) {
+    var historyCollection = getCollection("history");
     var normalizedValue = calculatorCore.serializeNumber(value);
 
-    historyEntries.unshift({
+    historyCollection.entries.unshift({
       expression: expression,
       value: normalizedValue
     });
-    persistHistory();
-    renderHistory();
+    persistEntries(historyCollection);
+    renderCollection(historyCollection);
 
-    if (historyEntries.length === 1) {
-      setHistoryOpen(true);
+    if (historyCollection.entries.length === 1) {
+      setDrawerView("history");
     }
   }
 
-  function syncHistoryDrawer() {
-    var isOpen = !historyPanel.hidden;
-    var openState = String(isOpen);
+  function syncDrawerToggle(collection, isActive) {
+    if (collection.panel) {
+      collection.panel.hidden = !isActive;
+    }
 
-    calculatorStage.dataset.historyOpen = openState;
-    historyDrawer.dataset.open = openState;
-    historyToggle.setAttribute("aria-expanded", openState);
-    historyToggle.setAttribute(
+    if (!collection.toggle) {
+      return;
+    }
+
+    collection.toggle.setAttribute("aria-expanded", String(isActive));
+    collection.toggle.setAttribute(
       "aria-label",
-      isOpen ? "Collapse history" : "Expand history"
+      (isActive ? "Collapse " : "Expand ") + collection.title.toLowerCase() + (collection.key === "saved" ? " items" : "")
     );
   }
 
-  function setHistoryOpen(nextOpen) {
-    historyPanel.hidden = !nextOpen;
-    syncHistoryDrawer();
+  function syncDrawerState() {
+    var isOpen = activeDrawerName !== "";
+
+    if (calculatorStage) {
+      calculatorStage.dataset.drawerOpen = isOpen ? activeDrawerName : "false";
+    }
+
+    if (historyDrawer) {
+      historyDrawer.dataset.open = String(isOpen);
+      historyDrawer.dataset.view = isOpen ? activeDrawerName : "none";
+    }
+
+    syncDrawerToggle(getCollection("history"), activeDrawerName === "history");
+    syncDrawerToggle(getCollection("saved"), activeDrawerName === "saved");
+  }
+
+  function setDrawerView(nextDrawerName) {
+    var nextCollection = nextDrawerName ? getCollection(nextDrawerName) : null;
+
+    closeEntryMenu();
+    activeDrawerName =
+      nextDrawerName && isCollectionDrawerAvailable(nextCollection)
+        ? nextDrawerName
+        : "";
+    syncDrawerState();
+  }
+
+  function toggleDrawerView(drawerName) {
+    setDrawerView(activeDrawerName === drawerName ? "" : drawerName);
   }
 
   function syncExpressionSelection() {
@@ -447,30 +780,79 @@
     updateDisplay();
   }
 
-  function insertHistoryValue(value) {
+  function insertEntryValue(value) {
     expressionInput.focus();
     expressionInput.setSelectionRange(savedSelectionStart, savedSelectionEnd);
     replaceSelection(value);
   }
 
-  function removeHistoryEntry(index) {
-    if (!Number.isInteger(index) || index < 0 || index >= historyEntries.length) {
+  function removeCollectionEntry(collectionName, index) {
+    var collection = getCollection(collectionName);
+
+    if (!collection ||
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= collection.entries.length) {
       return;
     }
 
-    historyEntries.splice(index, 1);
-    persistHistory();
-    renderHistory();
+    closeEntryMenu();
+    collection.entries.splice(index, 1);
+    persistEntries(collection);
+    renderCollection(collection);
+
+    if (collectionName === "saved") {
+      renderCollection(getCollection("history"));
+    }
   }
 
-  function clearHistory() {
-    if (historyEntries.length === 0) {
+  function clearCollection(collectionName) {
+    var collection = getCollection(collectionName);
+    var confirmMessage = "";
+    var isConfirmed = true;
+
+    if (!collection || collection.entries.length === 0) {
       return;
     }
 
-    historyEntries = [];
-    persistHistory();
-    renderHistory();
+    confirmMessage = collection.key === "history"
+      ? "Are you sure you want to clear all history?"
+      : "Are you sure you want to clear all saved items?";
+
+    if (typeof window.confirm === "function") {
+      isConfirmed = window.confirm(confirmMessage);
+    }
+
+    if (!isConfirmed) {
+      return;
+    }
+
+    closeEntryMenu();
+    collection.entries = [];
+    persistEntries(collection);
+    renderCollection(collection);
+
+    if (collectionName === "saved") {
+      renderCollection(getCollection("history"));
+    }
+  }
+
+  function saveHistoryEntry(index) {
+    var historyCollection = getCollection("history");
+    var savedCollection = getCollection("saved");
+    var entry = historyCollection.entries[index];
+
+    if (!entry || hasSavedEntry(entry)) {
+      setDrawerView("saved");
+      return;
+    }
+
+    closeEntryMenu();
+    savedCollection.entries.unshift(createEntryCopy(entry));
+    persistEntries(savedCollection);
+    renderCollection(savedCollection);
+    renderCollection(historyCollection);
+    setDrawerView("saved");
   }
 
   function removeCharacter() {
@@ -566,32 +948,96 @@
     syncExpressionSelection();
     syncParenthesisButton();
   });
-  historyToggle.addEventListener("click", function () {
-    setHistoryOpen(historyPanel.hidden);
-  });
-  if (historyClearButton) {
-    historyClearButton.addEventListener("click", function () {
-      clearHistory();
-    });
-  }
-  historyList.addEventListener("click", function (event) {
+  function handleCollectionListClick(collectionName, event) {
     var target = event.target;
 
-    if (!(target instanceof HTMLButtonElement)) {
+    if (!(target instanceof HTMLButtonElement) || target.disabled) {
       return;
     }
 
-    if (target.dataset.historyAction === "delete") {
-      removeHistoryEntry(Number(target.dataset.historyIndex));
+    if (isMenuToggleButton(target)) {
+      openEntryMenu(collectionName, Number(target.dataset.entryIndex), target);
       return;
     }
 
-    if (!target.dataset.historyValue) {
+    if (!target.dataset.entryValue) {
       return;
     }
 
-    insertHistoryValue(target.dataset.historyValue);
-  });
+    closeEntryMenu();
+    insertEntryValue(target.dataset.entryValue);
+  }
+
+  ensureMenuPopover();
+
+  if (menuPopover) {
+    menuPopover.addEventListener("click", function (event) {
+      var target = event.target;
+
+      if (!(target instanceof HTMLButtonElement) || target.disabled) {
+        return;
+      }
+
+      if (target.dataset.entryAction === "delete") {
+        removeCollectionEntry(activeMenuCollectionName, activeMenuIndex);
+        return;
+      }
+
+      if (target.dataset.entryAction === "save" && activeMenuCollectionName === "history") {
+        saveHistoryEntry(activeMenuIndex);
+      }
+    });
+  }
+
+  if (historyToggle) {
+    historyToggle.addEventListener("click", function () {
+      toggleDrawerView("history");
+    });
+  }
+  if (savedToggle) {
+    savedToggle.addEventListener("click", function () {
+      toggleDrawerView("saved");
+    });
+  }
+  if (historyClearButton) {
+    historyClearButton.addEventListener("click", function () {
+      clearCollection("history");
+    });
+  }
+  if (savedClearButton) {
+    savedClearButton.addEventListener("click", function () {
+      clearCollection("saved");
+    });
+  }
+  if (historyList) {
+    historyList.addEventListener("click", function (event) {
+      handleCollectionListClick("history", event);
+    });
+    historyList.addEventListener("scroll", closeEntryMenu);
+  }
+  if (savedList) {
+    savedList.addEventListener("click", function (event) {
+      handleCollectionListClick("saved", event);
+    });
+    savedList.addEventListener("scroll", closeEntryMenu);
+  }
+
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("click", function (event) {
+      var target = event.target;
+
+      if (menuPopover &&
+        !menuPopover.hidden &&
+        !isNodeWithin(target, menuPopover) &&
+        !isNodeWithin(target, activeMenuToggle)) {
+        closeEntryMenu();
+      }
+    });
+  }
+
+  if (typeof window.addEventListener === "function") {
+    window.addEventListener("resize", closeEntryMenu);
+  }
 
   if (phoneKeyboardMedia) {
     if (typeof phoneKeyboardMedia.addEventListener === "function") {
@@ -636,9 +1082,10 @@
     }
   });
 
-  setHistoryOpen(false);
-  loadHistory();
-  renderHistory();
+  setDrawerView("");
+  loadEntries(getCollection("history"));
+  loadEntries(getCollection("saved"));
+  renderCollections();
   registerServiceWorker();
   syncPhoneInputMode();
   updateDisplay();

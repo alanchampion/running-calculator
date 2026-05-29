@@ -97,17 +97,29 @@
           </details>
         </section>
 
-        <aside id="history-drawer" class="history-drawer" data-open="false">
-          <button
-            id="history-toggle"
-            class="history-drawer__toggle"
-            type="button"
-            aria-controls="history-panel"
-            aria-expanded="false"
-            aria-label="Expand history"
-          >
-            History
-          </button>
+        <aside id="history-drawer" class="history-drawer" data-open="false" data-view="none">
+          <div class="history-drawer__tabs" role="group" aria-label="Calculator collections">
+            <button
+              id="history-toggle"
+              class="history-drawer__toggle"
+              type="button"
+              aria-controls="history-panel"
+              aria-expanded="false"
+              aria-label="Expand history"
+            >
+              History
+            </button>
+            <button
+              id="saved-toggle"
+              class="history-drawer__toggle"
+              type="button"
+              aria-controls="saved-panel"
+              aria-expanded="false"
+              aria-label="Expand saved items"
+            >
+              Saved
+            </button>
+          </div>
           <section
             id="history-panel"
             class="history-panel"
@@ -136,6 +148,36 @@
               class="history-list"
               aria-live="polite"
               aria-label="Calculation history"
+            ></ul>
+          </section>
+          <section
+            id="saved-panel"
+            class="history-panel saved-panel"
+            aria-labelledby="saved-title"
+            hidden
+          >
+            <div class="history-panel__header">
+              <div class="history-panel__copy">
+                <h2 id="saved-title" class="history-panel__title">Saved</h2>
+                <p class="history-panel__subtitle">Keep useful calculations handy.</p>
+              </div>
+              <button
+                id="saved-clear"
+                class="history-panel__action"
+                type="button"
+                aria-controls="saved-list"
+              >
+                Clear all
+              </button>
+            </div>
+            <p id="saved-empty" class="history-panel__empty">
+              Use Save from a history item to pin it here.
+            </p>
+            <ul
+              id="saved-list"
+              class="history-list"
+              aria-live="polite"
+              aria-label="Saved calculations"
             ></ul>
           </section>
         </aside>

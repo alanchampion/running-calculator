@@ -25,7 +25,7 @@
   var historyEntries = [];
   var historyStorage = null;
   var hasResolvedHistoryStorage = false;
-  var lastValidValue = 0;
+  var lastValidValue = "0";
 
   function registerServiceWorker() {
     var host = window.location.hostname;
@@ -89,12 +89,25 @@
     }
   }
 
-  function isValidHistoryEntry(entry) {
-    return !!entry &&
-      typeof entry.expression === "string" &&
-      entry.expression.trim() !== "" &&
-      typeof entry.value === "number" &&
-      isFinite(entry.value);
+  function normalizeHistoryEntry(entry) {
+    var normalizedValue = null;
+
+    if (!entry ||
+      typeof entry.expression !== "string" ||
+      entry.expression.trim() === "") {
+      return null;
+    }
+
+    try {
+      normalizedValue = calculatorCore.serializeNumber(entry.value);
+    } catch (error) {
+      return null;
+    }
+
+    return {
+      expression: entry.expression,
+      value: normalizedValue
+    };
   }
 
   function saveHistory() {
@@ -116,7 +129,7 @@
     var savedHistory = null;
     var parsedHistory = null;
     var nextHistoryEntries = [];
-    var foundInvalidEntries = false;
+    var repairedHistory = false;
 
     if (!storage) {
       return;
@@ -148,22 +161,23 @@
     }
 
     for (var index = 0; index < parsedHistory.length; index += 1) {
-      var entry = parsedHistory[index];
+      var normalizedEntry = normalizeHistoryEntry(parsedHistory[index]);
 
-      if (!isValidHistoryEntry(entry)) {
-        foundInvalidEntries = true;
+      if (!normalizedEntry) {
+        repairedHistory = true;
         continue;
       }
 
-      nextHistoryEntries.push({
-        expression: entry.expression,
-        value: entry.value
-      });
+      if (normalizedEntry.value !== parsedHistory[index].value) {
+        repairedHistory = true;
+      }
+
+      nextHistoryEntries.push(normalizedEntry);
     }
 
     historyEntries = nextHistoryEntries;
 
-    if (foundInvalidEntries) {
+    if (repairedHistory) {
       console.error("Saved calculation history contained invalid entries and was repaired.");
       saveHistory();
     }
@@ -197,9 +211,11 @@
   }
 
   function addHistoryEntry(expression, value) {
+    var normalizedValue = calculatorCore.serializeNumber(value);
+
     historyEntries.unshift({
       expression: expression,
-      value: value
+      value: normalizedValue
     });
     saveHistory();
     renderHistory();
@@ -346,7 +362,7 @@
   }
 
   function getInsertableNumber(value) {
-    return calculatorCore.formatNumber(value).replace(/,/g, "");
+    return calculatorCore.serializeNumber(value);
   }
 
   function updateDisplay() {
@@ -359,7 +375,7 @@
       resultOutput.textContent = calculatorCore.formatNumber(state.value);
       setStatus(state.message, "success");
     } else if (state.status === "empty") {
-      lastValidValue = 0;
+      lastValidValue = "0";
       resultOutput.textContent = "0";
       setStatus(getEmptyStatusMessage());
     } else {
@@ -458,9 +474,9 @@
     }
 
     var committedExpression = expressionInput.value.trim();
-    var nextValue = String(state.value);
+    var nextValue = calculatorCore.serializeNumber(state.value);
 
-    addHistoryEntry(committedExpression, state.value);
+    addHistoryEntry(committedExpression, nextValue);
     expressionInput.value = nextValue;
     expressionInput.setSelectionRange(nextValue.length, nextValue.length);
     expressionInput.focus();

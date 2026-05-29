@@ -1,8 +1,9 @@
-var CACHE_NAME = "running-calculator-v2";
+var CACHE_NAME = "running-calculator-v3";
 var APP_SHELL_ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
+  "./vendor/decimal.min.js",
   "./calculator.js",
   "./script.js",
   "./manifest.webmanifest",

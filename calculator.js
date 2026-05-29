@@ -1,6 +1,8 @@
 (function (global) {
   "use strict";
 
+  var DecimalSource = global.Decimal;
+  var MAX_SERIALIZED_DECIMAL_PLACES = 12;
   var OPERATORS = {
     "+": { precedence: 1 },
     "-": { precedence: 1 },
@@ -8,6 +10,24 @@
     "/": { precedence: 2 },
     "^": { precedence: 3 }
   };
+
+  if (!DecimalSource && typeof require === "function") {
+    try {
+      DecimalSource = require("./vendor/decimal.min.js");
+    } catch (error) {
+      DecimalSource = null;
+    }
+  }
+
+  if (!DecimalSource || typeof DecimalSource.clone !== "function") {
+    throw new Error("decimal.js is required for CalculatorCore.");
+  }
+
+  var Decimal = DecimalSource.clone({
+    precision: 50,
+    toExpNeg: -1000,
+    toExpPos: 1000
+  });
 
   function createError(message, code) {
     var error = new Error(message);
@@ -161,7 +181,7 @@
           throw createError("A decimal point needs digits around it.", "INCOMPLETE");
         }
 
-        pushToken(tokens, { type: "number", value: Number(value) });
+        pushToken(tokens, { type: "number", value: value });
         continue;
       }
 
@@ -198,7 +218,7 @@
         var operator = currentToken().value;
         index += 1;
         var right = parseTerm();
-        value = operator === "+" ? value + right : value - right;
+        value = operator === "+" ? value.plus(right) : value.minus(right);
       }
 
       return value;
@@ -214,13 +234,13 @@
         var right = parseUnary();
 
         if (operator === "/") {
-          if (right === 0) {
+          if (right.isZero()) {
             throw createError("Cannot divide by zero.", "INVALID");
           }
 
-          value /= right;
+          value = value.div(right);
         } else {
-          value *= right;
+          value = value.times(right);
         }
       }
 
@@ -234,7 +254,7 @@
         (token.value === "+" || token.value === "-")) {
         index += 1;
         var unaryValue = parseUnary();
-        return token.value === "-" ? -unaryValue : unaryValue;
+        return token.value === "-" ? unaryValue.negated() : unaryValue;
       }
 
       return parsePower();
@@ -246,7 +266,7 @@
 
       if (token && token.type === "operator" && token.value === "^") {
         index += 1;
-        value = Math.pow(value, parseUnary());
+        value = Decimal.pow(value, parseUnary());
       }
 
       return value;
@@ -261,7 +281,7 @@
 
       if (token.type === "number") {
         index += 1;
-        return token.value;
+        return createDecimal(token.value);
       }
 
       if (token.type === "paren" && token.value === "(") {
@@ -307,37 +327,86 @@
     return result;
   }
 
-  function normalizeNumber(value) {
-    if (!Number.isFinite(value)) {
+  function normalizeDecimal(value) {
+    var decimalValue = value;
+
+    try {
+      if (!Decimal.isDecimal(decimalValue)) {
+        decimalValue = new Decimal(decimalValue);
+      }
+    } catch (error) {
       throw createError("The result is not a finite number.", "INVALID");
     }
 
-    if (Object.is(value, -0)) {
-      return 0;
+    if (decimalValue.isNaN()) {
+      throw createError("The result is not a real number.", "INVALID");
     }
 
-    var roundedValue = Number(value.toPrecision(15));
-
-    if (Object.is(roundedValue, -0)) {
-      return 0;
+    if (!decimalValue.isFinite()) {
+      throw createError("The result is not a finite number.", "INVALID");
     }
 
-    return Number(serializeRoundedNumber(roundedValue));
+    return decimalValue.isZero() ? new Decimal(0) : decimalValue;
   }
 
-  function serializeRoundedNumber(value) {
-    var fixedValue = value.toFixed(12);
+  function createDecimal(value) {
+    return normalizeDecimal(value);
+  }
 
-    if (fixedValue.indexOf(".") === -1) {
-      return fixedValue;
+  function trimSerializedNumber(value) {
+    if (value.indexOf(".") === -1) {
+      return value === "-0" ? "0" : value;
     }
 
-    fixedValue = fixedValue.replace(/0+$/, "").replace(/\.$/, "");
-    return fixedValue === "-0" ? "0" : fixedValue;
+    var trimmedValue = value.replace(/0+$/, "").replace(/\.$/, "");
+    return trimmedValue === "-0" ? "0" : trimmedValue;
+  }
+
+  function serializeExactDecimal(value) {
+    var decimalValue = normalizeDecimal(value);
+
+    if (decimalValue.isZero()) {
+      return "0";
+    }
+
+    return trimSerializedNumber(decimalValue.toString());
+  }
+
+  function serializeRoundedDecimal(value) {
+    var decimalValue = normalizeDecimal(value);
+
+    if (decimalValue.isZero()) {
+      return "0";
+    }
+
+    return trimSerializedNumber(decimalValue.toFixed(MAX_SERIALIZED_DECIMAL_PLACES));
+  }
+
+  function addThousandsSeparators(integerPart) {
+    return integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  function formatSerializedNumber(value) {
+    var sign = "";
+    var normalizedValue = value;
+    var parts = null;
+    var integerPart = "";
+    var fractionalPart = "";
+
+    if (normalizedValue[0] === "-") {
+      sign = "-";
+      normalizedValue = normalizedValue.slice(1);
+    }
+
+    parts = normalizedValue.split(".");
+    integerPart = parts[0] || "0";
+    fractionalPart = parts[1] ? "." + parts[1] : "";
+
+    return sign + addThousandsSeparators(integerPart) + fractionalPart;
   }
 
   function serializeNumber(value) {
-    return serializeRoundedNumber(normalizeNumber(value));
+    return serializeRoundedDecimal(value);
   }
 
   function evaluateExpression(expression) {
@@ -346,13 +415,11 @@
     }
 
     var tokens = tokenize(expression);
-    return normalizeNumber(parse(tokens));
+    return serializeExactDecimal(parse(tokens));
   }
 
   function formatNumber(value) {
-    return new Intl.NumberFormat("en-US", {
-      maximumFractionDigits: 12
-    }).format(normalizeNumber(value));
+    return formatSerializedNumber(serializeNumber(value));
   }
 
   function getExpressionState(expression) {

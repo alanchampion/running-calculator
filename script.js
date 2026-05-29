@@ -12,6 +12,7 @@
   var historyPanel = document.getElementById("history-panel");
   var historyList = document.getElementById("history-list");
   var historyEmptyState = document.getElementById("history-empty");
+  var historyClearButton = document.getElementById("history-clear");
   var keypad = document.querySelector(".keypad");
   var parenthesisButton = keypad.querySelector('[data-action="parenthesis"]');
   var phoneKeyboardMedia =
@@ -87,6 +88,15 @@
     } catch (error) {
       console.error("Failed to clear saved calculation history.", error);
     }
+  }
+
+  function persistHistory() {
+    if (historyEntries.length === 0) {
+      clearSavedHistory();
+      return;
+    }
+
+    saveHistory();
   }
 
   function normalizeHistoryEntry(entry) {
@@ -179,7 +189,7 @@
 
     if (repairedHistory) {
       console.error("Saved calculation history contained invalid entries and was repaired.");
-      saveHistory();
+      persistHistory();
     }
   }
 
@@ -187,13 +197,23 @@
     historyList.textContent = "";
     historyEmptyState.hidden = historyEntries.length > 0;
 
+    if (historyClearButton) {
+      historyClearButton.disabled = historyEntries.length === 0;
+    }
+
     for (var index = 0; index < historyEntries.length; index += 1) {
       var entry = historyEntries[index];
       var item = document.createElement("li");
+      var row = document.createElement("div");
       var expression = document.createElement("button");
       var result = document.createElement("button");
+      var menu = document.createElement("details");
+      var menuToggle = document.createElement("summary");
+      var menuPanel = document.createElement("div");
+      var deleteButton = document.createElement("button");
 
       item.className = "history-list__item";
+      row.className = "history-list__row";
       expression.type = "button";
       expression.className = "history-list__expression";
       expression.textContent = entry.expression;
@@ -204,8 +224,22 @@
       result.textContent = "= " + calculatorCore.formatNumber(entry.value);
       result.dataset.historyValue = getInsertableNumber(entry.value);
       result.setAttribute("aria-label", "Insert value " + result.dataset.historyValue);
+      menu.className = "history-list__menu";
+      menuToggle.className = "history-list__menu-toggle";
+      menuToggle.textContent = "...";
+      menuToggle.setAttribute("aria-label", "History item options for " + entry.expression);
+      menuPanel.className = "history-list__menu-panel";
+      deleteButton.type = "button";
+      deleteButton.className = "history-list__menu-action";
+      deleteButton.textContent = "Delete";
+      deleteButton.dataset.historyAction = "delete";
+      deleteButton.dataset.historyIndex = String(index);
+      deleteButton.setAttribute("aria-label", "Delete history item " + entry.expression);
 
-      item.append(expression, result);
+      menuPanel.append(deleteButton);
+      menu.append(menuToggle, menuPanel);
+      row.append(expression, menu);
+      item.append(row, result);
       historyList.append(item);
     }
   }
@@ -217,7 +251,7 @@
       expression: expression,
       value: normalizedValue
     });
-    saveHistory();
+    persistHistory();
     renderHistory();
 
     if (historyEntries.length === 1) {
@@ -419,6 +453,26 @@
     replaceSelection(value);
   }
 
+  function removeHistoryEntry(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= historyEntries.length) {
+      return;
+    }
+
+    historyEntries.splice(index, 1);
+    persistHistory();
+    renderHistory();
+  }
+
+  function clearHistory() {
+    if (historyEntries.length === 0) {
+      return;
+    }
+
+    historyEntries = [];
+    persistHistory();
+    renderHistory();
+  }
+
   function removeCharacter() {
     var start = expressionInput.selectionStart;
     var end = expressionInput.selectionEnd;
@@ -515,10 +569,24 @@
   historyToggle.addEventListener("click", function () {
     setHistoryOpen(historyPanel.hidden);
   });
+  if (historyClearButton) {
+    historyClearButton.addEventListener("click", function () {
+      clearHistory();
+    });
+  }
   historyList.addEventListener("click", function (event) {
     var target = event.target;
 
-    if (!(target instanceof HTMLButtonElement) || !target.dataset.historyValue) {
+    if (!(target instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    if (target.dataset.historyAction === "delete") {
+      removeHistoryEntry(Number(target.dataset.historyIndex));
+      return;
+    }
+
+    if (!target.dataset.historyValue) {
       return;
     }
 

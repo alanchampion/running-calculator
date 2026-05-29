@@ -1,4 +1,4 @@
-var CACHE_NAME = "running-calculator-v3";
+var CACHE_NAME = "running-calculator-v5";
 var APP_SHELL_ASSETS = [
   "./",
   "./index.html",

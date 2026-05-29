@@ -53,3 +53,12 @@ test("history item menus overlay cards instead of resizing them", function () {
     /\.history-list__menu-toggle\s*\{[\s\S]*border:\s*none;[\s\S]*\}/
   );
 });
+
+test("saved item names use a dedicated compact label style", function () {
+  const styles = fs.readFileSync(__dirname + "\\styles.css", "utf8");
+
+  assert.match(
+    styles,
+    /\.history-list__name\s*\{[\s\S]*color:\s*var\(--accent\);[\s\S]*font-size:\s*0\.82rem;[\s\S]*font-weight:\s*700;[\s\S]*\}/
+  );
+});

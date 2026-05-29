@@ -13,6 +13,12 @@ function createEnvironment(initialHistory, initialSaved, options) {
     ? environmentOptions.confirmDecisions.slice()
     : [environmentOptions.confirmResult !== false];
   const confirmCalls = [];
+  const promptResponses = Array.isArray(environmentOptions.promptResponses)
+    ? environmentOptions.promptResponses.slice()
+    : [Object.prototype.hasOwnProperty.call(environmentOptions, "promptResult")
+      ? environmentOptions.promptResult
+      : null];
+  const promptCalls = [];
 
   function registerListener(target, type, handler) {
     if (!listeners.has(target)) {
@@ -152,6 +158,10 @@ function createEnvironment(initialHistory, initialSaved, options) {
         confirmCalls.push(message);
         return confirmDecisions.length === 0 ? true : confirmDecisions.shift();
       },
+      prompt(message, defaultValue) {
+        promptCalls.push({ message, defaultValue });
+        return promptResponses.length === 0 ? null : promptResponses.shift();
+      },
       localStorage: storage,
       setTimeout(handler) {
         handler();
@@ -194,11 +204,31 @@ function createEnvironment(initialHistory, initialSaved, options) {
   vm.createContext(context);
   vm.runInContext(source, context);
 
-  return { elements, listeners, storage, confirmCalls };
+  return { elements, listeners, storage, confirmCalls, promptCalls };
+}
+
+function getItemRow(item) {
+  for (const child of item.children) {
+    if (child && child.className === "history-list__row") {
+      return child;
+    }
+  }
+
+  return null;
+}
+
+function getItemName(item) {
+  for (const child of item.children) {
+    if (child && child.className === "history-list__name") {
+      return child;
+    }
+  }
+
+  return null;
 }
 
 function getMenuToggle(item) {
-  return item.children[0].children[1].children[0];
+  return getItemRow(item).children[1].children[0];
 }
 
 function getMenuPopover(environment) {
@@ -265,7 +295,7 @@ test("deletes an individual history item and keeps insertion working", function 
   assert.deepEqual(savedHistory, [{ expression: "4+5", value: "9" }]);
   assert.equal(environment.elements["history-list"].children.length, 1);
 
-  const remainingExpressionButton = environment.elements["history-list"].children[0].children[0].children[0];
+  const remainingExpressionButton = getItemRow(environment.elements["history-list"].children[0]).children[0];
   environment.elements.expression.value = "7*";
   environment.elements.expression.selectionStart = 2;
   environment.elements.expression.selectionEnd = 2;
@@ -337,6 +367,57 @@ test("keeps entries when clear confirmation is cancelled", function () {
   ]);
   assert.equal(environment.elements["history-list"].children.length, 1);
   assert.equal(environment.elements["history-clear"].disabled, false);
+});
+
+test("adds and persists a name for a saved item", function () {
+  const environment = createEnvironment(
+    [],
+    [{ expression: "1+2", value: "3" }],
+    { promptResult: "Warmup" }
+  );
+  const savedClick = environment.listeners.get(environment.elements["saved-list"]).click;
+  const savedItem = environment.elements["saved-list"].children[0];
+
+  savedClick({ target: getMenuToggle(savedItem) });
+  environment.listeners.get(getMenuPopover(environment)).click({
+    target: getMenuButton(environment, 0)
+  });
+
+  assert.deepEqual(environment.promptCalls, [{
+    message: "Enter a name for this saved item. Leave blank to remove it.",
+    defaultValue: ""
+  }]);
+  assert.deepEqual(JSON.parse(environment.storage.data["running-calculator-saved"]), [
+    { expression: "1+2", value: "3", name: "Warmup" }
+  ]);
+  assert.equal(getItemName(environment.elements["saved-list"].children[0]).textContent, "Warmup");
+
+  savedClick({ target: getMenuToggle(environment.elements["saved-list"].children[0]) });
+
+  assert.equal(getMenuButton(environment, 0).textContent, "Rename");
+});
+
+test("blank saved item name removes the existing label", function () {
+  const environment = createEnvironment(
+    [],
+    [{ expression: "1+2", value: "3", name: "Warmup" }],
+    { promptResult: "   " }
+  );
+  const savedClick = environment.listeners.get(environment.elements["saved-list"]).click;
+
+  savedClick({ target: getMenuToggle(environment.elements["saved-list"].children[0]) });
+  environment.listeners.get(getMenuPopover(environment)).click({
+    target: getMenuButton(environment, 0)
+  });
+
+  assert.deepEqual(environment.promptCalls, [{
+    message: "Enter a name for this saved item. Leave blank to remove it.",
+    defaultValue: "Warmup"
+  }]);
+  assert.deepEqual(JSON.parse(environment.storage.data["running-calculator-saved"]), [
+    { expression: "1+2", value: "3" }
+  ]);
+  assert.equal(getItemName(environment.elements["saved-list"].children[0]), null);
 });
 
 test("history item menus render in a shared drawer popover", function () {

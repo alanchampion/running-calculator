@@ -157,8 +157,38 @@
     }
   }
 
-  function normalizeEntry(entry) {
+  function getNormalizedSavedEntryName(entry) {
+    if (!entry || typeof entry.name === "undefined") {
+      return undefined;
+    }
+
+    if (typeof entry.name !== "string") {
+      return "";
+    }
+
+    return entry.name.trim();
+  }
+
+  function hasSavedEntryNameRepair(entry, normalizedEntry, collection) {
+    var normalizedName = "";
+
+    if (collection.key !== "saved" || !entry || typeof entry.name === "undefined") {
+      return false;
+    }
+
+    normalizedName = getNormalizedSavedEntryName(entry);
+
+    if (!normalizedName) {
+      return true;
+    }
+
+    return normalizedEntry.name !== entry.name;
+  }
+
+  function normalizeEntry(entry, collection) {
     var normalizedValue = null;
+    var normalizedName = undefined;
+    var normalizedEntry = null;
 
     if (!entry ||
       typeof entry.expression !== "string" ||
@@ -172,10 +202,20 @@
       return null;
     }
 
-    return {
+    normalizedEntry = {
       expression: entry.expression,
       value: normalizedValue
     };
+
+    if (collection.key === "saved") {
+      normalizedName = getNormalizedSavedEntryName(entry);
+
+      if (normalizedName) {
+        normalizedEntry.name = normalizedName;
+      }
+    }
+
+    return normalizedEntry;
   }
 
   function loadEntries(collection) {
@@ -215,14 +255,15 @@
     }
 
     for (var index = 0; index < parsedEntries.length; index += 1) {
-      var normalizedEntry = normalizeEntry(parsedEntries[index]);
+      var normalizedEntry = normalizeEntry(parsedEntries[index], collection);
 
       if (!normalizedEntry) {
         repairedEntries = true;
         continue;
       }
 
-      if (normalizedEntry.value !== parsedEntries[index].value) {
+      if (normalizedEntry.value !== parsedEntries[index].value ||
+        hasSavedEntryNameRepair(parsedEntries[index], normalizedEntry, collection)) {
         repairedEntries = true;
       }
 
@@ -238,10 +279,26 @@
   }
 
   function createEntryCopy(entry) {
-    return {
+    var entryCopy = {
       expression: entry.expression,
       value: entry.value
     };
+
+    if (typeof entry.name === "string" && entry.name !== "") {
+      entryCopy.name = entry.name;
+    }
+
+    return entryCopy;
+  }
+
+  function getEntryLabel(entry) {
+    return entry && typeof entry.name === "string" && entry.name !== ""
+      ? entry.name
+      : entry.expression;
+  }
+
+  function getSavedNameAriaLabel(entry) {
+    return "Saved item name " + entry.name;
   }
 
   function isSameEntry(leftEntry, rightEntry) {
@@ -287,6 +344,7 @@
     for (var index = 0; index < collection.entries.length; index += 1) {
       var entry = collection.entries[index];
       var item = document.createElement("li");
+      var name = null;
       var row = document.createElement("div");
       var expression = document.createElement("button");
       var result = document.createElement("button");
@@ -295,6 +353,14 @@
 
       item.className = "history-list__item";
       row.className = "history-list__row";
+
+      if (collection.key === "saved" && entry.name) {
+        name = document.createElement("p");
+        name.className = "history-list__name";
+        name.textContent = entry.name;
+        name.setAttribute("aria-label", getSavedNameAriaLabel(entry));
+      }
+
       expression.type = "button";
       expression.className = "history-list__expression";
       expression.textContent = entry.expression;
@@ -314,9 +380,12 @@
       menuToggle.dataset.entryIndex = String(index);
       menuToggle.setAttribute("aria-expanded", "false");
       menuToggle.setAttribute("aria-haspopup", "menu");
-      menuToggle.setAttribute("aria-label", collection.title + " item options for " + entry.expression);
+      menuToggle.setAttribute("aria-label", collection.title + " item options for " + getEntryLabel(entry));
       menu.append(menuToggle);
       row.append(expression, menu);
+      if (name) {
+        item.append(name);
+      }
       item.append(row, result);
       listElement.append(item);
     }
@@ -443,6 +512,8 @@
     var collection = getCollection(collectionName);
     var entry = collection && collection.entries[index];
     var isSavedAlready = false;
+    var nameActionLabel = "";
+    var nameActionAriaLabel = "";
 
     if (!menuPopover || !collection || !entry) {
       return false;
@@ -460,6 +531,21 @@
         "save",
         (isSavedAlready ? "Saved " : "Save ") + "history item " + entry.expression,
         isSavedAlready
+      );
+    }
+
+    if (collectionName === "saved") {
+      nameActionLabel = entry.name ? "Rename" : "Add name";
+      nameActionAriaLabel = entry.name
+        ? "Rename saved item " + entry.name
+        : "Add a name to saved item " + entry.expression;
+
+      addMenuPopoverAction(
+        nameActionLabel,
+        "history-list__menu-action history-list__menu-action--primary",
+        "name",
+        nameActionAriaLabel,
+        false
       );
     }
 
@@ -806,6 +892,51 @@
     }
   }
 
+  function setSavedEntryName(index) {
+    var savedCollection = getCollection("saved");
+    var entry = savedCollection.entries[index];
+    var rawName = null;
+    var nextName = "";
+
+    if (!entry) {
+      return;
+    }
+
+    closeEntryMenu();
+
+    if (typeof window.prompt !== "function") {
+      return;
+    }
+
+    rawName = window.prompt(
+      "Enter a name for this saved item. Leave blank to remove it.",
+      entry.name || ""
+    );
+
+    if (rawName === null) {
+      return;
+    }
+
+    nextName = rawName.trim();
+
+    if (!nextName && !entry.name) {
+      return;
+    }
+
+    if (nextName === entry.name) {
+      return;
+    }
+
+    if (nextName) {
+      entry.name = nextName;
+    } else {
+      delete entry.name;
+    }
+
+    persistEntries(savedCollection);
+    renderCollection(savedCollection);
+  }
+
   function clearCollection(collectionName) {
     var collection = getCollection(collectionName);
     var confirmMessage = "";
@@ -980,6 +1111,11 @@
 
       if (target.dataset.entryAction === "delete") {
         removeCollectionEntry(activeMenuCollectionName, activeMenuIndex);
+        return;
+      }
+
+      if (target.dataset.entryAction === "name" && activeMenuCollectionName === "saved") {
+        setSavedEntryName(activeMenuIndex);
         return;
       }
 
